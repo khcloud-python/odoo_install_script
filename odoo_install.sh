@@ -38,6 +38,8 @@ OE_CONFIG="${OE_USER}-server"
 
 CODENAME=`lsb_release -c --short`
 
+PYPI_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple"
+
 ##
 ###  WKHTMLTOPDF download links
 ## === Ubuntu ${trusty} x64 & x32 === (for other distributions please replace these two links,
@@ -55,16 +57,14 @@ echo -e "\n---- Switch to aliyun source list ----"
 sudo mv /etc/apt/sources.list /etc/apt/sources.list.backup
 sudo touch /etc/apt/sources.list
 sudo cat <<EOF > /etc/apt/sources.list
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME} main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-backports main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-proposed main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-security main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-updates main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME} main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-backports main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-proposed main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-security main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-updates main multiverse restricted universe
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME} main restricted universe multiverse
+deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME} main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME}-updates main restricted universe multiverse
+deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME}-updates main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME}-backports main restricted universe multiverse
+deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME}-backports main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME}-security main restricted universe multiverse
+deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ ${CODENAME}-security main restricted universe multiverse
 EOF
 sudo apt update
 
@@ -75,7 +75,6 @@ sudo apt-get install software-properties-common
 # universe package is for Ubuntu 18.x
 sudo add-apt-repository universe
 # libpng12-0 dependency for wkhtmltopdf
-#sudo add-apt-repository "deb http://mirrors.kernel.org/ubuntu/ xenial main"
 sudo add-apt-repository "deb http://mirrors.kernel.org/ubuntu/ ${CODENAME} main"
 sudo apt-get update
 sudo apt-get upgrade -y
@@ -84,9 +83,12 @@ sudo apt-get upgrade -y
 # Install PostgreSQL Server
 #--------------------------------------------------
 echo -e "\n---- Install PostgreSQL Server ----"
-sudo echo 'deb http://apt.postgresql.org/pub/repos/apt/ ${CODENAME}-pgdg main' > /etc/apt/sources.list.d/pgdg.list
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+#sudo echo 'deb http://apt.postgresql.org/pub/repos/apt/ ${CODENAME}-pgdg main' > /etc/apt/sources.list.d/pgdg.list
 sudo apt update
-sudo apt install postgresql -y
+#sudo apt install postgresql -y
+sudo apt install postgresql postgresql-contrib -y
 
 echo -e "\n---- Creating the ODOO PostgreSQL User  ----"
 sudo su - postgres -c "createuser -s $OE_USER" 2> /dev/null || true
@@ -95,7 +97,9 @@ sudo su - postgres -c "createuser -s $OE_USER" 2> /dev/null || true
 # Install rtlcss (on Debian stretch)
 #--------------------------------------------------
 echo -e "\n---- Install rtlcss ----"
-sudo echo "deb http://deb.nodesource.com/node_8.x ${CODENAME} main" > /etc/apt/sources.list.d/nodesource.list
+wget --quiet -O - https://deb.nodesource.com/gpgkey/nodesource.gpg.key | sudo apt-key add -
+sudo sh -c 'echo "deb http://deb.nodesource.com/node_12.x $(lsb_release -cs) main" > /etc/apt/sources.list.d/nodesource.list'
+#sudo echo "deb http://deb.nodesource.com/node_12.x $(lsb_release -cs) main" > /etc/apt/sources.list.d/nodesource.list
 sudo apt update
 sudo apt install -y nodejs
 sudo npm install -g rtlcss
@@ -104,17 +108,20 @@ sudo npm install -g rtlcss
 # Install Dependencies
 #--------------------------------------------------
 echo -e "\n--- Installing Python 3 + pip3 --"
-sudo apt-get install git python3 python3-pip build-essential wget python3-dev python3-venv python3-wheel libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools node-less libpng12-0 gdebi -y
+sudo apt-get install git python3 python3-pip build-essential wget python3-dev python3-venv python3-wheel \
+                     libxslt-dev libzip-dev libldap2-dev libsasl2-dev python3-setuptools node-less libpng12-0 gdebi -y --allow-unauthenticated
 
 echo -e "\n---- Install python packages/requirements ----"
-sudo pip3 install -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
+sudo pip3 install -i ${PYPI_MIRROR} -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
 
 echo -e "\n---- Install python libraries depend by others ----"
-sudo pip3 install num2words ofxparse xmltodict XlsxWriter xlwt xlrd pycryptodome
+sudo pip3 install -i ${PYPI_MIRROR} num2words ofxparse xmltodict XlsxWriter xlwt xlrd pycryptodome
 
 echo -e "\n---- Installing nodeJS NPM and rtlcss for LTR support ----"
 sudo apt-get install nodejs npm
 sudo npm install -g rtlcss
+sudo npm install -g less
+sudo npm install -g less-plugin-clean-css
 
 #--------------------------------------------------
 # Install Wkhtmltopdf if needed
@@ -171,8 +178,8 @@ if [ $IS_ENTERPRISE = "True" ]; then
     echo -e "\n---- Added Enterprise code under $OE_HOME/enterprise/addons ----"
     echo -e "\n---- Installing Enterprise specific libraries ----"
     #sudo pip3 install num2words ofxparse xmltodict xlwt pycryptodome
-    sudo npm install -g less
-    sudo npm install -g less-plugin-clean-css
+    #sudo npm install -g less
+    #sudo npm install -g less-plugin-clean-css
 fi
 
 echo -e "\n---- Create custom module directory ----"
@@ -225,21 +232,25 @@ PATH=/bin:/sbin:/usr/bin
 DAEMON=$OE_HOME_EXT/odoo-bin
 NAME=$OE_CONFIG
 DESC=$OE_CONFIG
+
 # Specify the user name (Default: odoo).
 USER=$OE_USER
+
 # Specify an alternate config file (Default: /etc/openerp-server.conf).
 CONFIGFILE="/etc/${OE_CONFIG}.conf"
+
 # pidfile
 PIDFILE=/var/run/\${NAME}.pid
+
 # Additional options that are passed to the Daemon.
 DAEMON_OPTS="-c \$CONFIGFILE"
 [ -x \$DAEMON ] || exit 0
 [ -f \$CONFIGFILE ] || exit 0
 checkpid() {
-[ -f \$PIDFILE ] || return 1
-pid=\`cat \$PIDFILE\`
-[ -d /proc/\$pid ] && return 0
-return 1
+  [ -f \$PIDFILE ] || return 1
+  pid=\`cat \$PIDFILE\`
+  [ -d /proc/\$pid ] && return 0
+  return 1
 }
 case "\${1}" in
 start)

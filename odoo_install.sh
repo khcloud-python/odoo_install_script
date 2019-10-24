@@ -40,6 +40,8 @@ OE_CONFIG="${OE_USER}-server"
 
 CODENAME=`lsb_release -c --short`
 
+PYPI_MIRROR="https://pypi.tuna.tsinghua.edu.cn/simple"
+
 ##
 ###  WKHTMLTOPDF download links
 ## === Ubuntu Trusty x64 & x32 === (for other distributions please replace these two links,
@@ -52,24 +54,26 @@ echo -e "\n---- Switch to aliyun source list ----"
 
 sudo mv /etc/apt/sources.list /etc/apt/sources.list.backup
 sudo touch /etc/apt/sources.list
-sudo cat <<EOF > /etc/apt/sources.list
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME} main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-backports main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-proposed main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-security main multiverse restricted universe
-deb http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-updates main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME} main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-backports main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-proposed main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-security main multiverse restricted universe
-deb-src http://mirrors.aliyun.com/ubuntu/ ${CODENAME}-updates main multiverse restricted universe
-EOF
-sudo apt update
+
+sudo sh -c 'echo "deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs) main restricted universe multiverse" > /etc/apt/sources.list'
+sudo sh -c 'echo "deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs) main restricted universe multiverse" >> /etc/apt/sources.list'
+sudo sh -c 'echo "deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-updates main restricted universe multiverse" >> /etc/apt/sources.list'
+sudo sh -c 'echo "deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-updates main restricted universe multiverse" >> /etc/apt/sources.list'
+sudo sh -c 'echo "deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-backports main restricted universe multiverse" >> /etc/apt/sources.list'
+sudo sh -c 'echo "deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-backports main restricted universe multiverse" >> /etc/apt/sources.list'
+sudo sh -c 'echo "deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-security main restricted universe multiverse" >> /etc/apt/sources.list'
+sudo sh -c 'echo "deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ $(lsb_release -cs)-security main restricted universe multiverse" >> /etc/apt/sources.list'
 
 #--------------------------------------------------
 # Update Server
 #--------------------------------------------------
 echo -e "\n---- Update Server ----"
+# add-apt-repository can install add-apt-repository Ubuntu 18.x
+sudo apt-get install software-properties-common
+# universe package is for Ubuntu 18.x
+sudo add-apt-repository universe
+# libpng12-0 dependency for wkhtmltopdf
+sudo add-apt-repository "deb http://mirrors.kernel.org/ubuntu/ ${CODENAME} main"
 sudo apt-get update
 sudo apt-get upgrade -y
 
@@ -77,10 +81,16 @@ sudo apt-get upgrade -y
 # Install PostgreSQL Server
 #--------------------------------------------------
 echo -e "\n---- Install PostgreSQL Server ----"
-sudo apt-get install postgresql -y
+echo -e "\n---- Install PostgreSQL Server ----"
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+#sudo echo 'deb http://apt.postgresql.org/pub/repos/apt/ ${CODENAME}-pgdg main' > /etc/apt/sources.list.d/pgdg.list
+sudo apt update
+#sudo apt install postgresql -y
+sudo apt install postgresql postgresql-contrib -y
 
 echo -e "\n---- Creating the ODOO PostgreSQL User  ----"
-sudo su - postgres -c "createuser -s $OE_USER" 2> /dev/null || true
+sudo su - postgres -c "create user $OE_USER with SUPERUSER CREATEDB REPLICATION encrypted password '$OE_USER';" 2> /dev/null || true
 
 #--------------------------------------------------
 # Install Dependencies
@@ -91,8 +101,12 @@ sudo apt-get install wget git python-pip gdebi-core -y
 echo -e "\n---- Install python packages ----"
 sudo apt-get install python-dateutil python-feedparser python-ldap python-libxslt1 python-lxml python-mako python-openid python-psycopg2 python-pybabel python-pychart python-pydot python-pyparsing python-reportlab python-simplejson python-tz python-vatnumber python-vobject python-webdav python-werkzeug python-xlwt python-yaml python-zsi python-docutils python-psutil python-mock python-unittest2 python-jinja2 python-pypdf python-decorator python-requests python-passlib python-pil -y python-suds
 
-echo -e "\n---- Install python libraries ----"
-sudo pip install gdata psycogreen ofxparse XlsxWriter xlrd xlwt
+echo -e "\n---- Install python packages/requirements ----"
+sudo pip install -i ${PYPI_MIRROR} -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
+
+echo -e "\n---- Install python libraries depend by others ----"
+sudo pip install -i ${PYPI_MIRROR} num2words gdata psycogreen ofxparse xmltodict XlsxWriter xlwt xlrd pycryptodome
+
 
 echo -e "\n--- Install other required packages"
 sudo apt-get install node-clean-css -y
@@ -208,6 +222,7 @@ cat <<EOF > ~/$OE_CONFIG
 # Short-Description: Enterprise Business Applications
 # Description: ODOO Business Applications
 ### END INIT INFO
+
 PATH=/bin:/sbin:/usr/bin
 DAEMON=$OE_HOME_EXT/odoo-bin
 NAME=$OE_CONFIG
@@ -227,43 +242,44 @@ DAEMON_OPTS="-c \$CONFIGFILE"
 [ -x \$DAEMON ] || exit 0
 [ -f \$CONFIGFILE ] || exit 0
 checkpid() {
-[ -f \$PIDFILE ] || return 1
-pid=\`cat \$PIDFILE\`
-[ -d /proc/\$pid ] && return 0
-return 1
+  [ -f \$PIDFILE ] || return 1
+  pid=\`cat \$PIDFILE\`
+  [ -d /proc/\$pid ] && return 0
+  return 1
 }
 
 case "\${1}" in
-start)
-echo -n "Starting \${DESC}: "
-start-stop-daemon --start --quiet --pidfile \$PIDFILE \
---chuid \$USER --background --make-pidfile \
---exec \$DAEMON -- \$DAEMON_OPTS
-echo "\${NAME}."
-;;
-stop)
-echo -n "Stopping \${DESC}: "
-start-stop-daemon --stop --quiet --pidfile \$PIDFILE \
---oknodo
-echo "\${NAME}."
-;;
+  start)
+    echo -n "Starting \${DESC}: "
+    start-stop-daemon --start --quiet --pidfile \$PIDFILE \
+    --chuid \$USER --background --make-pidfile \
+    --exec \$DAEMON -- \$DAEMON_OPTS
+    echo "\${NAME}."
+  ;;
 
-restart|force-reload)
-echo -n "Restarting \${DESC}: "
-start-stop-daemon --stop --quiet --pidfile \$PIDFILE \
---oknodo
-sleep 1
-start-stop-daemon --start --quiet --pidfile \$PIDFILE \
---chuid \$USER --background --make-pidfile \
---exec \$DAEMON -- \$DAEMON_OPTS
-echo "\${NAME}."
-;;
-*)
-N=/etc/init.d/\$NAME
-echo "Usage: \$NAME {start|stop|restart|force-reload}" >&2
-exit 1
-;;
+  stop)
+    echo -n "Stopping \${DESC}: "
+    start-stop-daemon --stop --quiet --pidfile \$PIDFILE \
+    --oknodo
+    echo "\${NAME}."
+  ;;
 
+  restart|force-reload)
+    echo -n "Restarting \${DESC}: "
+    start-stop-daemon --stop --quiet --pidfile \$PIDFILE \
+    --oknodo
+    sleep 1
+    start-stop-daemon --start --quiet --pidfile \$PIDFILE \
+    --chuid \$USER --background --make-pidfile \
+    --exec \$DAEMON -- \$DAEMON_OPTS
+    echo "\${NAME}."
+  ;;
+
+  *)
+    N=/etc/init.d/\$NAME
+    echo "Usage: \$NAME {start|stop|restart|force-reload}" >&2
+    exit 1
+  ;;
 esac
 exit 0
 EOF

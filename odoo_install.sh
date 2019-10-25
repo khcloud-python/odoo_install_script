@@ -102,8 +102,12 @@ sudo apt install postgresql postgresql-contrib -y
 
 echo -e "\n---- Creating the ODOO PostgreSQL User  ----"
 #sudo su - postgres -c "createuser -s $OE_USER" 2> /dev/null || true
-#/etc/init.d/postgresql start  && psql --command "CREATE USER root WITH SUPERUSER CREATEDB REPLICATION;"
 sudo su - postgres -c "create user $OE_USER with SUPERUSER CREATEDB REPLICATION encrypted password '$OE_USER';" 2> /dev/null || true
+
+# Invalid script
+#sudo su - postgres -c "createuser -d -E -r -s --replication $OE_USER"
+#sudo -u postgres psql -c "ALTER USER $OE_USER WITH ENCRYPTED PASSWORD '$OE_USER';"
+
 
 #--------------------------------------------------
 # Install rtlcss (on Debian stretch)

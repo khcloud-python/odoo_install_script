@@ -81,7 +81,6 @@ sudo apt-get upgrade -y
 # Install PostgreSQL Server
 #--------------------------------------------------
 echo -e "\n---- Install PostgreSQL Server ----"
-echo -e "\n---- Install PostgreSQL Server ----"
 wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
 sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt/ $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
 #sudo echo 'deb http://apt.postgresql.org/pub/repos/apt/ ${CODENAME}-pgdg main' > /etc/apt/sources.list.d/pgdg.list
@@ -102,7 +101,7 @@ sudo apt-get install wget git python-pip gdebi-core -y
 
 
 echo -e "\n---- Install python packages ----"
-sudo apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev python-dateutil python-feedparser python-ldap  python-libxslt1 python-lxml python-mako python-openid python-psycopg2 python-pybabel python-pychart python-pydot python-pyparsing python-reportlab python-simplejson python-tz python-vatnumber python-vobject python-webdav python-werkzeug python-xlwt python-yaml python-zsi python-docutils python-psutil python-mock python-unittest2 python-jinja2 python-pypdf python-decorator python-requests python-passlib python-pil -y python-suds
+sudo apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev python-dateutil python-feedparser python-ldap  python-libxslt1 python-lxml python-mako python-openid python-psycopg2 python-pybabel python-pychart python-pydot python-pyparsing python-reportlab python-simplejson python-tz python-vatnumber python-vobject python-webdav python-werkzeug python-xlwt python-yaml python-zsi python-docutils python-psutil python-mock python-unittest2 python-jinja2 python-pypdf python-decorator python-requests python-passlib python-pil python-suds python-gevent -y
 
 echo -e "\n---- Install python packages/requirements ----"
 sudo pip install -i ${PYPI_MIRROR} -r https://github.com/odoo/odoo/raw/${OE_VERSION}/requirements.txt
@@ -114,7 +113,7 @@ sudo pip install -i ${PYPI_MIRROR} num2words gdata psycogreen ofxparse xmltodict
 echo -e "\n--- Install other required packages"
 sudo apt-get install node-clean-css -y
 sudo apt-get install node-less -y
-sudo apt-get install python-gevent -y
+#sudo apt-get install python-gevent -y
 
 
 echo -e "\n---- Installing npm and less ----"
